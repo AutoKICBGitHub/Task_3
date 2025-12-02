@@ -8,8 +8,6 @@ venv/
 ENV/
 .venv
 .pytest_cache/
-allure-report/
-allure-results/
 *.log
 .DS_Store
 .idea/
