@@ -1,7 +1,6 @@
 import allure
 from pages.base_page import BasePage
 from locators.main_page_locators import MainPageLocators
-from selenium.webdriver.common.by import By
 from data.test_data import TestData
 
 
@@ -44,18 +43,25 @@ class MainPage(BasePage):
     @allure.step("Получить значение счётчика ингредиента")
     def get_ingredient_counter(self, ingredient_locator):
         element = self.find_element(ingredient_locator)
-        parent = element.find_element(By.XPATH, "./ancestor::a[contains(@class, 'BurgerIngredient_ingredient__1TVf6')]")
-        counter_element = parent.find_element(*self.locators.INGREDIENT_COUNTER)
+        parent = self.execute_script(
+            "return arguments[0].closest('a.BurgerIngredient_ingredient__1TVf6');",
+            element
+        )
+        counter_locator = self.locators.INGREDIENT_COUNTER
+        counter_element = parent.find_element(*counter_locator)
         counter_text = counter_element.text.strip()
         return int(counter_text) if counter_text and counter_text.isdigit() else 0
     
     @allure.step("Добавить ингредиент в конструктор")
     def add_ingredient_to_constructor(self, ingredient_locator):
         ingredient_text = self.find_element(ingredient_locator)
-        ingredient = ingredient_text.find_element(By.XPATH, "./ancestor::a[contains(@class, 'BurgerIngredient_ingredient__1TVf6')]")
+        ingredient = self.execute_script(
+            "return arguments[0].closest('a.BurgerIngredient_ingredient__1TVf6');",
+            ingredient_text
+        )
         drop_area = self.find_element(self.locators.CONSTRUCTOR_DROP_AREA)
         
-        self.driver.execute_script("""
+        self.execute_script("""
             var source = arguments[0];
             var target = arguments[1];
             var dragStartEvent = new DragEvent('dragstart', {
@@ -104,3 +110,19 @@ class MainPage(BasePage):
     def _close_any_modal_if_present(self):
         if self.is_modal_visible(self.locators.INGREDIENT_DETAILS_MODAL, timeout=TestData.VERY_SHORT_TIMEOUT):
             self.close_order_modal()
+    
+    @allure.step("Ожидать обновления счётчика булки")
+    def wait_for_bun_counter_updated(self, timeout=None):
+        self.wait_until(lambda driver: self.get_ingredient_counter(self.locators.INGREDIENT_BUN) > 0, timeout=timeout)
+    
+    @allure.step("Ожидать обновления счётчика соуса")
+    def wait_for_sauce_counter_updated(self, timeout=None):
+        self.wait_until(lambda driver: self.get_ingredient_counter(self.locators.INGREDIENT_SAUCE) > 0, timeout=timeout)
+    
+    @allure.step("Ожидать появления номера заказа")
+    def wait_for_order_number_visible(self, timeout=None):
+        self.wait_until(lambda driver: self.is_element_visible(self.locators.ORDER_NUMBER, timeout=TestData.SHORT_TIMEOUT), timeout=timeout)
+    
+    @allure.step("Ожидать валидного номера заказа")
+    def wait_for_order_number_valid(self, timeout=None):
+        self.wait_until(lambda driver: (order_num := self.get_order_number()) and order_num.strip() and order_num.strip() != "9999" and order_num.strip() != "", timeout=timeout)

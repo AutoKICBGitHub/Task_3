@@ -1,8 +1,6 @@
 import allure
 from pages.base_page import BasePage
 from locators.order_feed_locators import OrderFeedLocators
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException
 from data.test_data import TestData
 
@@ -24,16 +22,14 @@ class OrderFeedPage(BasePage):
             raise ValueError(f"Заказ с индексом {order_index} не найден. Всего заказов: {len(orders)}")
         
         order = orders[order_index]
-        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", order)
-        wait = WebDriverWait(self.driver, TestData.SHORT_TIMEOUT)
+        self.execute_script("arguments[0].scrollIntoView({block: 'center'});", order)
+        self.wait_until(lambda driver: orders[order_index].is_displayed(), timeout=TestData.SHORT_TIMEOUT)
         
-        def order_displayed(driver):
-            return orders[order_index].is_displayed()
-        
-        wait.until(order_displayed)
-        
-        link = order.find_element(By.XPATH, ".//a[contains(@class, 'OrderHistory_link__1iNby')]")
-        self.driver.execute_script("arguments[0].click();", link)
+        link = self.execute_script(
+            "return arguments[0].querySelector('a.OrderHistory_link__1iNby');",
+            order
+        )
+        self.execute_script("arguments[0].click();", link)
     
     @allure.step("Проверить видимость модального окна с деталями заказа")
     def is_order_modal_visible(self):
@@ -44,7 +40,7 @@ class OrderFeedPage(BasePage):
     @allure.step("Закрыть модальное окно с деталями заказа")
     def close_order_modal(self):
         element = self.find_element(self.locators.MODAL_CLOSE_BUTTON)
-        self.driver.execute_script("arguments[0].click();", element)
+        self.execute_script("arguments[0].click();", element)
         try:
             self.wait_for_element_to_disappear(self.locators.ORDER_DETAILS_MODAL, timeout=TestData.MODAL_TIMEOUT)
         except TimeoutException:
@@ -80,3 +76,25 @@ class OrderFeedPage(BasePage):
     @allure.step("Получить номер заказа из модального окна")
     def get_order_number_from_modal(self):
         return self.get_text(self.locators.MODAL_ORDER_NUMBER)
+    
+    @allure.step("Ожидать увеличения счётчика")
+    def wait_for_counter_increase(self, counter_type, initial_value, timeout=None):
+        timeout = timeout or TestData.DEFAULT_TIMEOUT
+        
+        if counter_type == "all_time":
+            get_counter = self.get_done_all_time_counter
+        elif counter_type == "today":
+            get_counter = self.get_done_today_counter
+        else:
+            raise ValueError(f"Неизвестный тип счётчика: {counter_type}")
+        
+        self.wait_until(
+            lambda driver: (
+                current_value := int(current_counter) if (current_counter := get_counter()) and current_counter.isdigit() else 0
+            ) is not None and current_value > initial_value,
+            timeout=timeout
+        )
+        
+        new_counter = get_counter()
+        new_value = int(new_counter) if new_counter and new_counter.isdigit() else 0
+        return new_value

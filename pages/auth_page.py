@@ -1,7 +1,6 @@
 import allure
 from pages.base_page import BasePage
 from locators.auth_locators import AuthLocators
-from locators.main_page_locators import MainPageLocators
 
 
 class AuthPage(BasePage):
@@ -35,8 +34,3 @@ class AuthPage(BasePage):
     @allure.step("Кликнуть на кнопку 'Восстановить пароль'")
     def click_restore_password_button(self):
         self.click_element(self.locators.RESTORE_PASSWORD_BUTTON)
-    
-    @allure.step("Кликнуть на кнопку 'Личный кабинет' в хедере")
-    def click_personal_account_button(self):
-        main_locators = MainPageLocators()
-        self.click_element(main_locators.PERSONAL_ACCOUNT_BUTTON)

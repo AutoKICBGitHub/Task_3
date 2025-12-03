@@ -1,21 +1,18 @@
 import pytest
 import allure
 import os
-import random
-import string
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.firefox.service import Service as FirefoxService
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from pages.main_page import MainPage
 from pages.auth_page import AuthPage
 from pages.restore_password_page import RestorePasswordPage
 from pages.personal_account_page import PersonalAccountPage
 from pages.order_feed_page import OrderFeedPage
 from helpers.api_helper import ApiHelper
+from helpers.email_helper import generate_test_email
 from data.test_data import TestData
 
 
@@ -40,7 +37,6 @@ def driver_chrome():
         
         service = ChromeService(driver_path)
         driver = webdriver.Chrome(service=service, options=options)
-        driver.implicitly_wait(TestData.IMPLICIT_WAIT)
         driver.maximize_window()
         
         yield driver
@@ -69,7 +65,6 @@ def driver_firefox():
         
         service = FirefoxService(driver_path)
         driver = webdriver.Firefox(service=service, options=options)
-        driver.implicitly_wait(TestData.IMPLICIT_WAIT)
         driver.maximize_window()
         
         yield driver
@@ -100,11 +95,6 @@ def driver(request):
     yield driver_instance
 
 
-def generate_test_email():
-    random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    return f"test_{random_string}@example.com"
-
-
 @pytest.fixture(scope="function")
 def test_user():
     api = ApiHelper()
@@ -127,93 +117,75 @@ def test_user():
 
 @pytest.fixture(scope="function")
 def logged_in_user(driver, test_user):
-    driver.get(TestData.BASE_URL)
-    
     main_page = MainPage(driver)
+    main_page.navigate_to(TestData.BASE_URL)
     main_page.click_personal_account_button()
-    
-    wait = WebDriverWait(driver, TestData.DEFAULT_TIMEOUT)
-    wait.until(EC.url_contains("login"))
+    main_page.wait_for_url_contains("login")
     
     auth_page = AuthPage(driver)
     auth_page.login(test_user["email"], test_user["password"])
     
-    wait.until(EC.url_to_be(TestData.BASE_URL))
+    main_page.wait_until(lambda d: main_page.get_current_url() == TestData.BASE_URL)
     
     yield test_user
 
 
 @pytest.fixture(scope="function")
 def main_page(driver):
-    driver.get(TestData.BASE_URL)
-    return MainPage(driver)
+    page = MainPage(driver)
+    page.navigate_to(TestData.BASE_URL)
+    return page
 
 
 @pytest.fixture(scope="function")
 def auth_page(driver):
-    driver.get(f"{TestData.BASE_URL}login")
-    return AuthPage(driver)
+    page = AuthPage(driver)
+    page.navigate_to(f"{TestData.BASE_URL}login")
+    return page
 
 
 @pytest.fixture(scope="function")
 def restore_password_page(driver):
-    driver.get(f"{TestData.BASE_URL}forgot-password")
-    return RestorePasswordPage(driver)
+    page = RestorePasswordPage(driver)
+    page.navigate_to(f"{TestData.BASE_URL}forgot-password")
+    return page
 
 
 @pytest.fixture(scope="function")
 def personal_account_page(driver, logged_in_user):
-    driver.get(TestData.BASE_URL)
     main_page = MainPage(driver)
+    main_page.navigate_to(TestData.BASE_URL)
     main_page.click_personal_account_button()
-    
-    wait = WebDriverWait(driver, TestData.DEFAULT_TIMEOUT)
-    wait.until(EC.url_contains("account"))
+    main_page.wait_for_url_contains("account")
     
     return PersonalAccountPage(driver)
 
 
 @pytest.fixture(scope="function")
 def order_feed_page(driver):
-    driver.get(f"{TestData.BASE_URL}feed")
-    return OrderFeedPage(driver)
+    page = OrderFeedPage(driver)
+    page.navigate_to(f"{TestData.BASE_URL}feed")
+    return page
 
 
 @pytest.fixture(scope="function")
 def created_order(driver, logged_in_user):
-    driver.get(TestData.BASE_URL)
     main_page = MainPage(driver)
+    main_page.navigate_to(TestData.BASE_URL)
     main_page.wait_for_page_load()
     
-    wait = WebDriverWait(driver, TestData.DEFAULT_TIMEOUT)
-    
-    def bun_counter_updated(driver):
-        return main_page.get_ingredient_counter(main_page.locators.INGREDIENT_BUN) > 0
-    
     main_page.add_ingredient_to_constructor(main_page.locators.INGREDIENT_BUN)
-    wait.until(bun_counter_updated)
-    
-    def sauce_counter_updated(driver):
-        return main_page.get_ingredient_counter(main_page.locators.INGREDIENT_SAUCE) > 0
+    main_page.wait_for_bun_counter_updated()
     
     main_page.add_ingredient_to_constructor(main_page.locators.INGREDIENT_SAUCE)
-    wait.until(sauce_counter_updated)
+    main_page.wait_for_sauce_counter_updated()
     
     main_page.click_order_button()
     main_page.wait_for_element_visible(main_page.locators.ORDER_MODAL, timeout=TestData.ORDER_MODAL_TIMEOUT)
     
-    wait_long = WebDriverWait(driver, TestData.ORDER_MODAL_TIMEOUT)
+    main_page.wait_for_order_number_visible(timeout=TestData.ORDER_MODAL_TIMEOUT)
+    main_page.wait_for_order_number_valid(timeout=TestData.ORDER_MODAL_TIMEOUT)
     
-    def order_number_visible(driver):
-        return main_page.is_element_visible(main_page.locators.ORDER_NUMBER, timeout=TestData.SHORT_TIMEOUT)
-    
-    wait_long.until(order_number_visible)
-    
-    def order_number_valid(driver):
-        order_num = main_page.get_order_number()
-        return order_num and order_num.strip() and order_num.strip() != "9999" and order_num.strip() != ""
-    
-    wait_long.until(order_number_valid)
     order_number = main_page.get_order_number()
     assert order_number and order_number.strip() and order_number.strip() != "9999", \
         f"Не удалось получить номер заказа. Получено: {order_number}"

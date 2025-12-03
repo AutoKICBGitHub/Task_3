@@ -5,6 +5,7 @@ class AuthLocators:
     
     EMAIL_INPUT = (By.XPATH, "//label[contains(text(), 'Email')]/following-sibling::input")
     PASSWORD_INPUT = (By.XPATH, "//input[@name='Пароль' and @type='password']")
+    PASSWORD_INPUT_GENERAL = (By.XPATH, "//input[@name='Пароль']")
     NAME_INPUT = (By.XPATH, "//label[contains(text(), 'Имя')]/following-sibling::input")
     LOGIN_BUTTON = (By.XPATH, "//button[contains(@class, 'button_button') and text()='Войти']")
     REGISTER_BUTTON = (By.XPATH, "//button[contains(@class, 'button_button') and text()='Зарегистрироваться']")
